@@ -1,0 +1,23 @@
+{
+  "name": "browser-usb",
+  "version": "0.1.0",
+  "description": "node-usb in your browser (via chrome application)",
+  "main": "index.js",
+  "scripts": {
+    "test": "lab -cvL"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jacobrosenthal/browser-usb"
+  },
+  "author": "Jacob Rosenthal <jakerosenthal@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jacobrosenthal/browser-usb/issues"
+  },
+  "homepage": "https://github.com/jacobrosenthal/browser-usb",
+  "devDependencies": {
+  },
+  "dependencies": {
+  }
+}
