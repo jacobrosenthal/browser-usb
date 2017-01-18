@@ -23,9 +23,44 @@ function toArrayBuffer(buffer) {
   return ab;
 }
 
+var Interface = function(number, device) {
+  this.number = number;
+  this.handle = device;
+};
+
+Interface.prototype.claim = function(cb) {
+  console.log('claim', this.handle, this.number);
+  chrome.usb.claimInterface(this.handle, this.number, cb);
+};
+
+Interface.prototype.setAltSetting = function(altSetting, cb) {
+  console.log('setAltSetting', this.handle, this.number, altSetting);
+  chrome.usb.setInterfaceAlternateSetting(this.handle, this.number, altSetting, cb);
+};
+
+Interface.prototype.release = function(cb) {
+  chrome.usb.releaseInterface(this.handle, this.number, cb);
+};
+
 var Device = function(device) {
   this.device = device;
   this.handle = null;
+  this.timeout = 1000;
+
+  this.deviceDescriptor = {
+    idVendor: this.device.vendorId,
+    idProduct: this.device.productId,
+
+    iManufacturer: -1,
+    iProduct: -2,
+    iSerialNumber: -3,
+
+    manufacturerName: this.device.manufacturerName,
+    productName: this.device.productName,
+    serialNumber: this.device.serialNumber
+  };
+
+  this.interfaces = {};
 };
 
 Device.prototype.controlTransfer = function(bmRequestType, bRequest, wValue, wIndex, data_or_length, cb){
@@ -33,7 +68,8 @@ Device.prototype.controlTransfer = function(bmRequestType, bRequest, wValue, wIn
   var transferInfo = {
     request: bRequest,
     value: wValue,
-    index: wIndex
+    index: wIndex,
+    timeout: this.timeout
   };
 
   // in libusb requesttype is (USB_ENDPOINT_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE)
@@ -92,15 +128,71 @@ Device.prototype.controlTransfer = function(bmRequestType, bRequest, wValue, wIn
 
 Device.prototype.open = function(cb){
   var self = this;
-  chrome.usb.openDevice(this.device, function (handle) {
-      self.handle = handle;
-      return cb();
-  });
 
+  chrome.usb.openDevice(self.device, function (handle) {
+    self.handle = handle;
+
+    chrome.usb.getConfigurations(self.device, function(configs) {
+      var interfaces = [];
+
+      configs.forEach(function(config) {
+        var interface_ = [];
+
+        config.interfaces.forEach(function(i) {
+          interface_.push({
+            bInterfaceNumber: i.interfaceNumber,
+            bAlternateSetting: i.alternateSetting,
+            bInterfaceClass: i.interfaceClass,
+            bInterfaceSubClass: i.interfaceSubclass,
+            bInterfaceProtocol: i.interfaceProtocol,
+            extra: toBuffer(i.extra_data),
+            endpoints: []
+          });
+        });
+
+        if (config.active) {
+          self.configDescriptor = {
+            bConfigurationValue: config.configurationValue,
+            bMaxPower: config.maxPower,
+            extra: toBuffer(config.extra_data),
+            interfaces: interfaces
+          };
+        }
+
+        interfaces.push(interface_);
+      });
+
+      return cb();
+    });
+  });
 };
 
-Device.prototype.close = function(){
-  chrome.usb.closeDevice(this.handle);
+Device.prototype.close = function(cb){
+  chrome.usb.closeDevice(this.handle, cb);
+};
+
+Device.prototype.getStringDescriptor = function(index, cb){
+  if (index === this.deviceDescriptor.iManufacturer) {
+    return cb(null, this.deviceDescriptor.manufacturerName);
+  } else if (index === this.deviceDescriptor.iProduct) {
+    return cb(null, this.deviceDescriptor.productName);
+  } else if (index === this.deviceDescriptor.iSerialNumber) {
+    return cb(null, this.deviceDescriptor.serialNumber);
+  } else {
+    return cb(new Error("getStringDescriptor not supported for index: " + index));
+  }
+};
+
+Device.prototype.interface = function(number) {
+  if (!this.interfaces[number]) {
+    this.interfaces[number] = new Interface(number, this.handle);
+  }
+
+  return this.interfaces[number];
+};
+
+Device.prototype.reset = function(cb) {
+  chrome.usb.resetDevice(this.handle, cb);
 };
 
 // convenience method for finding a device by vendor and product id
@@ -118,3 +210,30 @@ exports.findByIds = function(vid, pid, cb) {
 
   });
 };
+
+exports.getDeviceList = function(cb) {
+  chrome.usb.getDevices({}, function(devices){
+    if(typeof devices === undefined){
+      return cb(new Error('Permission denied.'));
+    }
+
+    var convertedDevices = Array.from(devices, function(device) {
+      return new Device(device);
+    });
+
+    cb(null, convertedDevices);
+  });
+};
+
+exports.LIBUSB_ENDPOINT_IN           = 0x80;
+exports.LIBUSB_ENDPOINT_OUT          = 0x00;
+
+exports.LIBUSB_REQUEST_TYPE_STANDARD = (0x00 << 5);
+exports.LIBUSB_REQUEST_TYPE_CLASS    = (0x01 << 5);
+exports.LIBUSB_REQUEST_TYPE_VENDOR   = (0x02 << 5);
+exports.LIBUSB_REQUEST_TYPE_RESERVED = (0x03 << 5);
+
+exports.LIBUSB_RECIPIENT_DEVICE      = 0x00;
+exports.LIBUSB_RECIPIENT_INTERFACE   = 0x01;
+exports.LIBUSB_RECIPIENT_ENDPOINT    = 0x02;
+exports.LIBUSB_RECIPIENT_OTHER       = 0x03;
