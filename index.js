@@ -29,12 +29,10 @@ var Interface = function(number, device) {
 };
 
 Interface.prototype.claim = function(cb) {
-  console.log('claim', this.handle, this.number);
   chrome.usb.claimInterface(this.handle, this.number, cb);
 };
 
 Interface.prototype.setAltSetting = function(altSetting, cb) {
-  console.log('setAltSetting', this.handle, this.number, altSetting);
   chrome.usb.setInterfaceAlternateSetting(this.handle, this.number, altSetting, cb);
 };
 
