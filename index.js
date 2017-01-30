@@ -29,15 +29,21 @@ var Interface = function(number, device) {
 };
 
 Interface.prototype.claim = function(cb) {
-  chrome.usb.claimInterface(this.handle, this.number, cb);
+  chrome.usb.claimInterface(this.handle, this.number, function() {
+    cb(chrome.runtime.lastError);
+  });
 };
 
 Interface.prototype.setAltSetting = function(altSetting, cb) {
-  chrome.usb.setInterfaceAlternateSetting(this.handle, this.number, altSetting, cb);
+  chrome.usb.setInterfaceAlternateSetting(this.handle, this.number, altSetting, function() {
+    cb(chrome.runtime.lastError);
+  });
 };
 
 Interface.prototype.release = function(cb) {
-  chrome.usb.releaseInterface(this.handle, this.number, cb);
+  chrome.usb.releaseInterface(this.handle, this.number, function() {
+    cb(chrome.runtime.lastError);
+  });
 };
 
 var Device = function(device) {
@@ -128,10 +134,16 @@ Device.prototype.open = function(cb){
   var self = this;
 
   chrome.usb.openDevice(self.device, function (handle) {
+    if (chrome.runtime.lastError) {
+      return cb(chrome.runtime.lastError);
+    }
+
     self.handle = handle;
 
     chrome.usb.getConfigurations(self.device, function(configs) {
       var interfaces = [];
+
+      configs = configs || [];
 
       configs.forEach(function(config) {
         var interface_ = [];
@@ -166,7 +178,9 @@ Device.prototype.open = function(cb){
 };
 
 Device.prototype.close = function(cb){
-  chrome.usb.closeDevice(this.handle, cb);
+  chrome.usb.closeDevice(this.handle, function() {
+    cb(chrome.runtime.lastError);
+  });
 };
 
 Device.prototype.getStringDescriptor = function(index, cb){
@@ -190,14 +204,16 @@ Device.prototype.interface = function(number) {
 };
 
 Device.prototype.reset = function(cb) {
-  chrome.usb.resetDevice(this.handle, cb);
+  chrome.usb.resetDevice(this.handle, function() {
+    cb(chrome.runtime.lastError);
+  });
 };
 
 // convenience method for finding a device by vendor and product id
 exports.findByIds = function(vid, pid, cb) {
   chrome.usb.getDevices({'vendorId': vid, 'productId': pid}, function(devices){
-    if(typeof devices === undefined){
-      return cb(new Error('Permission denied.'));
+    if(chrome.runtime.lastError){
+      return cb(chrome.runtime.lastError);
     }
 
     if (devices.length === 0){
@@ -211,8 +227,8 @@ exports.findByIds = function(vid, pid, cb) {
 
 exports.getDeviceList = function(cb) {
   chrome.usb.getDevices({}, function(devices){
-    if(typeof devices === undefined){
-      return cb(new Error('Permission denied.'));
+    if(chrome.runtime.lastError){
+      return cb(chrome.runtime.lastError);
     }
 
     var convertedDevices = Array.from(devices, function(device) {
