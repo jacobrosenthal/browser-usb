@@ -1,3 +1,5 @@
+/* jshint node: true */
+/* globals chrome: false */
 'use strict';
 
 // Check that libusb was initialized.
@@ -123,8 +125,10 @@ Device.prototype.controlTransfer = function(bmRequestType, bRequest, wValue, wIn
   }
 
   chrome.usb.controlTransfer( this.handle, transferInfo, function(info){
+    if (chrome.runtime.lastError) {
+      return cb(chrome.runtime.lastError);
+    }
 
-    //info.data undefined for output transfers, maybe also if there is no data?
     cb(chrome.runtime.lastError, toBuffer(info.data));
   });
 
@@ -160,6 +164,8 @@ Device.prototype.open = function(cb){
           });
         });
 
+        interfaces.push(interface_);
+
         if (config.active) {
           self.configDescriptor = {
             bConfigurationValue: config.configurationValue,
@@ -168,8 +174,6 @@ Device.prototype.open = function(cb){
             interfaces: interfaces
           };
         }
-
-        interfaces.push(interface_);
       });
 
       return cb();

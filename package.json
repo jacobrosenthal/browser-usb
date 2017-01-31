@@ -4,7 +4,8 @@
   "description": "node-usb in your browser (via chrome application)",
   "main": "index.js",
   "scripts": {
-    "test": "lab -cvL"
+    "pretest": "jshint index.js test/.",
+    "test": "mocha"
   },
   "repository": {
     "type": "git",
@@ -17,7 +18,8 @@
   },
   "homepage": "https://github.com/jacobrosenthal/browser-usb",
   "devDependencies": {
+    "mocha": "^3.2.0",
+    "sinon": "^1.17.7"
   },
-  "dependencies": {
-  }
+  "dependencies": {}
 }
